@@ -47,13 +47,13 @@ export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
 }) => {
   const lw = laneWidth || LANE_WIDTH;
   const rh = rowHeight || LANE_WIDTH;
-  const colorPool: BranchColor[] = (colorPalette || COLOR_PALETTE).map(
+  const colorPool: BranchColor[] =useMemo(() => (colorPalette || COLOR_PALETTE).map(
     (color, index) => ({
       color,
       branch: null,
       lane: index + 1,
     }),
-  );
+  ),[colorPalette,commits]);
   function getNewColor(): BranchColor {
     var index = colorPool.findIndex((c) => !c.branch);
     if (index > -1) {
@@ -121,43 +121,73 @@ export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
     });
     return _c;
   }, [commits, rh, lw]);
+function getPath(
+  from: _CommitItem,
+  to: _CommitItem) {
 
-  function getPath(from: _CommitItem, to: _CommitItem) {
-    const x1 = from.cx;
-    const y1 = from.cy;
-    const x2 = to.cx;
-    const y2 = to.cy;
+  const ax = from.cx
+  const ay = from.cy;
 
-    // Same lane → straight line
-    if (x1 === x2) {
-      return `M ${x1} ${y1} L ${x2} ${y2}`;
-    }
+  const bx = to.cx;
+  const by = to.cy;
 
-    const direction = y2 > y1 ? 1 : -1;
-    const curveHeight = rh * direction;
+  const laneWidth = lw+lw*0.01;
+  const rowHeight = rh+rh*0.01;
 
-    const curveEndY = y1 + curveHeight;
+  const dx = bx - ax;
+  const dy = by - ay;
 
-    // If total height is smaller than rw → fallback full curve
-    if (Math.abs(y2 - y1) <= rh) {
-      const midY = (y1 + y2) / 2;
-      return `
-      M ${x1} ${y1}
-      C ${x1} ${midY},
-        ${x2} ${midY},
-        ${x2} ${y2}
-    `;
-    }
+  const xDirection = Math.sign(dx);
+  const yDirection = Math.sign(dy);
 
-    return `
-    M ${x1} ${y1}
-    C ${x1} ${y1 + curveHeight / 2},
-      ${x2} ${y1 + curveHeight / 2},
-      ${x2} ${curveEndY}
-    L ${x2} ${y2}
-  `;
+  const totalLaneShiftX = Math.abs(dx);
+  const totalLaneShiftY = Math.abs(dy);
+  const steps = Math.min(
+    Math.floor(totalLaneShiftX / laneWidth),
+    Math.floor(totalLaneShiftY / rowHeight),
+  );
+  const stepHeight = rowHeight * yDirection;
+  const curveSize = laneWidth * 1; //1=no offset
+
+  let currentX = ax;
+  let currentY = ay;
+
+  let d = `M ${currentX} ${currentY} `;
+
+  // Step lane-by-lane
+  for (let i = 0; i < steps; i++) {
+    const nextX = currentX + xDirection * laneWidth;
+    const nextY = currentY + stepHeight;
+
+    const c1x = currentX;
+    const c1y = currentY + yDirection * curveSize;
+
+    const c2x = nextX;
+    const c2y = nextY - yDirection * curveSize;
+
+    d += `C ${c1x} ${c1y}, ${c2x} ${c2y}, ${nextX} ${nextY} `;
+
+    currentX = nextX;
+    currentY = nextY;
   }
 
+  const remainingDx = bx - currentX;
+  const remainingDy = by - currentY;
+
+  const xDir = Math.sign(remainingDx);
+  const yDir = Math.sign(remainingDy);
+
+  const curveStrength = laneWidth * 1; //1 = no offset
+
+  const c1x = currentX;
+  const c1y = currentY + yDir * curveStrength;
+
+  const c2x = bx;
+  const c2y = by - yDir * curveStrength;
+
+  d += `C ${c1x} ${c1y}, ${c2x} ${c2y}, ${bx} ${by}`;
+  return d;
+}
   return (
     <svg width={lanesCount * lw + 100} height={rh * _commits.length}>
       {_commits.flatMap((commit) =>
