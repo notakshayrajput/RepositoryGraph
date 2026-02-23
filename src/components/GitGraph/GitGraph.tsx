@@ -12,6 +12,13 @@ export interface GitGraphSVGProps {
   rowHeight?: number;
   colorPalette?: string[];
   laneWidth?: number;
+
+  renderNode?: (commit: CommitItem) => React.ReactNode;
+  renderEdge?: (
+    from: CommitItem,
+    to: CommitItem,
+    defaultPath: string,
+  ) => React.ReactNode;
 }
 type BranchColor = {
   color: string;
@@ -29,26 +36,24 @@ export interface _CommitItem extends CommitItem {
 //Defaults
 const LANE_WIDTH = 50;
 const NODE_RADIUS = 5;
-const COLOR_PALETTE = [
-  "#3a86ff",
-  "#8338ec",
-  "#ff006e",
-  "#fb5607",
-  "#ffbe0b",
-];
+const COLOR_PALETTE = ["#3a86ff", "#8338ec", "#ff006e", "#fb5607", "#ffbe0b"];
 export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
   commits,
   rowHeight,
   colorPalette,
   laneWidth,
+  renderNode,
+  renderEdge,
 }) => {
   const lw = laneWidth || LANE_WIDTH;
   const rh = rowHeight || LANE_WIDTH;
-  const colorPool: BranchColor[] = (colorPalette || COLOR_PALETTE).map((color, index) => ({
-    color,
-    branch: null,
-    lane: index + 1,
-  }));
+  const colorPool: BranchColor[] = (colorPalette || COLOR_PALETTE).map(
+    (color, index) => ({
+      color,
+      branch: null,
+      lane: index + 1,
+    }),
+  );
   function getNewColor(): BranchColor {
     var index = colorPool.findIndex((c) => !c.branch);
     if (index > -1) {
@@ -153,31 +158,44 @@ export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
   `;
   }
 
-
   return (
     <svg width={lanesCount * lw + 100} height={rh * _commits.length}>
       {_commits.flatMap((commit) =>
-        commit.prev.map((prevCommit) => (
-          <path
-            key={`${commit.id}-${prevCommit.id}`}
-            d={getPath(commit, prevCommit)}
-            fill="none"
-            stroke={
-              commit.lane <= prevCommit.lane ? prevCommit.color : commit.color
-            }
-            strokeWidth={2}
-          />
-        )),
+        commit.prev.map((prevCommit) => {
+          const path = getPath(commit, prevCommit);
+
+          if (renderEdge) {
+            return renderEdge(commit, prevCommit, path);
+          }
+
+          return (
+            <path
+              key={`${commit.id}-${prevCommit.id}`}
+              d={path}
+              fill="none"
+              stroke={
+                commit.lane <= prevCommit.lane ? prevCommit.color : commit.color
+              }
+              strokeWidth={2}
+            />
+          );
+        }),
       )}
-      {_commits.map((commit) => (
-        <circle
-          key={commit.id}
-          cx={commit.cx}
-          cy={commit.cy}
-          r={NODE_RADIUS}
-          fill={commit.color}
-        />
-      ))}
+      {_commits.map((commit) => {
+        if (renderNode) {
+          return renderNode(commit);
+        }
+
+        return (
+          <circle
+            key={commit.id}
+            cx={commit.cx}
+            cy={commit.cy}
+            r={NODE_RADIUS}
+            fill={commit.color}
+          />
+        );
+      })}
     </svg>
   );
 };
