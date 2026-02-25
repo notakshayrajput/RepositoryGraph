@@ -13,17 +13,18 @@ export interface GitGraphSVGProps {
   colorPalette?: string[];
   laneWidth?: number;
 
-  renderNode?: (commit: CommitItem) => React.ReactNode;
+  renderNode?: (commit: _CommitItem,index?:number) => React.ReactNode;
   renderEdge?: (
-    from: CommitItem,
-    to: CommitItem,
-    defaultPath: string,
+    from: _CommitItem,
+    to: _CommitItem,
+    index?: number
   ) => React.ReactNode;
 }
 type BranchColor = {
   color: string;
   branch: string | null;
   lane: number;
+  index: number;
 };
 export interface _CommitItem extends CommitItem {
   color: string;
@@ -31,6 +32,7 @@ export interface _CommitItem extends CommitItem {
   cx: number;
   cy: number;
   prev: _CommitItem[];
+  index: number;
 }
 
 //Defaults
@@ -47,13 +49,16 @@ export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
 }) => {
   const lw = laneWidth || LANE_WIDTH;
   const rh = rowHeight || LANE_WIDTH;
-  const colorPool: BranchColor[] =useMemo(() => (colorPalette || COLOR_PALETTE).map(
-    (color, index) => ({
-      color,
-      branch: null,
-      lane: index + 1,
-    }),
-  ),[colorPalette,commits]);
+  const colorPool: BranchColor[] = useMemo(
+    () =>
+      (colorPalette || COLOR_PALETTE).map((color, index) => ({
+        color,
+        branch: null,
+        lane: index + 1,
+        index,
+      })),
+    [colorPalette, commits],
+  );
   function getNewColor(): BranchColor {
     var index = colorPool.findIndex((c) => !c.branch);
     if (index > -1) {
@@ -63,12 +68,13 @@ export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
         color: "#" + Math.floor(Math.random() * 16777215).toString(16),
         branch: null,
         lane: colorPool.length + 1,
+        index,
       };
       colorPool.push(c);
       return c;
     }
   }
-  const [lanesCount, setLanesCount] = React.useState(0);
+ 
   const _commits = useMemo(() => {
     var _c: _CommitItem[] = [];
 
@@ -82,30 +88,42 @@ export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
         cx: 0,
         cy: 0,
         prev: [], // initialize empty
+        index
       };
-
-      var brachColor = colorPool.find((c) => c.branch == commit.id);
-      if (!brachColor) {
-        brachColor = getNewColor();
-      }
-      //check parent commit id has color assigned already, if yes then free up the color
-      var parentColor = colorPool.find((c) => c.branch == commit.parents[0]);
-      if (!parentColor) {
-        brachColor.branch = commit.parents[0];
+      var branchColor = colorPool.find((c) => c.branch == commit.id);
+      if (!branchColor) {
+        branchColor = getNewColor();
       } else {
-        brachColor.branch = null;
+        //Free up any other color that has same branch id// when two branches emerge from same parent branch
+        colorPool.forEach((c) => {
+          if (c.branch === commit.id && c.index !== branchColor?.index) {
+            c.branch = null;
+          }
+        });
       }
-      c.color = brachColor.color; //Save color in commit
-      c.lane = brachColor.lane;
+    
+      for (const parent of commit.parents) {
+        const parentColor = colorPool.find((c) => c.branch === parent);
+        if (!parentColor || parentColor.index > branchColor.index) {   
+                if(branchColor.branch == commit.id)        
+                branchColor.branch = parent;
+            else {
+                var color = colorPool.find((c)=>!c.branch);
+                if(!color)color = getNewColor();
+                color.branch = parent;
+            }
+        //   break; 
+        } else {
+          branchColor.branch = null;
+        }
+      }
+
+      c.color = branchColor.color; //Save color in commit
+      c.lane = branchColor.lane;
       c.cx = c.lane * lw - lw / 2;
       c.cy = rh * index + lw / 2;
 
-      var activeLanes = colorPool.reduce((count, c) => {
-        return c.branch !== null ? count + 1 : count;
-      }, 0);
-      if (activeLanes > lanesCount) {
-        setLanesCount(activeLanes);
-      }
+      
       _c.push(c);
 
       commitMap.set(c.id, c);
@@ -121,86 +139,91 @@ export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
     });
     return _c;
   }, [commits, rh, lw]);
-function getPath(
-  from: _CommitItem,
-  to: _CommitItem) {
+  function getPath(from: _CommitItem, to: _CommitItem) {
+    //   const offset = 3 * (from.lane - to.lane);
+    const ax = from.cx;
+    const ay = from.cy;
 
-  const ax = from.cx
-  const ay = from.cy;
 
-  const bx = to.cx;
-  const by = to.cy;
+    const bx = to.cx;
+    const by = to.cy;    
 
-  const laneWidth = lw+lw*0.01;
-  const rowHeight = rh+rh*0.01;
+    const laneWidth = lw/2 // lw * 0.01;
+    const rowHeight = (rh+ rh * 0.01)/2;
 
-  const dx = bx - ax;
-  const dy = by - ay;
+    const dx = bx - ax;
+    const dy = by - ay ;
 
-  const xDirection = Math.sign(dx);
-  const yDirection = Math.sign(dy);
+    const xDirection = Math.sign(dx);
+    const yDirection = Math.sign(dy);
 
-  const totalLaneShiftX = Math.abs(dx);
-  const totalLaneShiftY = Math.abs(dy);
-  const steps = Math.min(
-    Math.floor(totalLaneShiftX / laneWidth),
-    Math.floor(totalLaneShiftY / rowHeight),
-  );
-  const stepHeight = rowHeight * yDirection;
-  const curveSize = laneWidth * 1; //1=no offset
+    const totalLaneShiftX = Math.abs(dx);
+    const totalLaneShiftY = Math.abs(dy);
+    const steps = Math.min(
+      Math.floor(totalLaneShiftX / laneWidth),
+      Math.floor(totalLaneShiftY / rowHeight),
+    );
+    const stepHeight = rowHeight * yDirection;
+    const curveSize = laneWidth * 1; //1=no offset
 
-  let currentX = ax;
-  let currentY = ay;
+    let currentX = ax;
+    let currentY = ay;
 
-  let d = `M ${currentX} ${currentY} `;
+    let d = `M ${currentX} ${currentY} `;
 
-  // Step lane-by-lane
-  for (let i = 0; i < steps; i++) {
-    const nextX = currentX + xDirection * laneWidth;
-    const nextY = currentY + stepHeight;
+    // Step lane-by-lane
+    for (let i = 0; i < steps; i++) {
+      const nextX = currentX + xDirection * laneWidth;
+      const nextY = currentY + stepHeight;
+    
+      const c1x = currentX;
+      const c1y = currentY + yDirection * curveSize;
+
+      const c2x = nextX;
+      const c2y = nextY - yDirection * curveSize;
+
+      d += `C ${c1x} ${c1y}, ${c2x} ${c2y}, ${nextX} ${nextY} `;
+
+      currentX = nextX;
+      currentY = nextY;
+    }
+
+    const remainingDx = bx - currentX;
+    const remainingDy = by - currentY;
+
+    const xDir = Math.sign(remainingDx);
+    const yDir = Math.sign(remainingDy);
+
+    const curveStrength = laneWidth * 1; //1 = no offset
 
     const c1x = currentX;
-    const c1y = currentY + yDirection * curveSize;
+    const c1y = currentY + yDir * curveStrength;
 
-    const c2x = nextX;
-    const c2y = nextY - yDirection * curveSize;
+    const c2x = bx;
+    const c2y = by - yDir * curveStrength;
 
-    d += `C ${c1x} ${c1y}, ${c2x} ${c2y}, ${nextX} ${nextY} `;
-
-    currentX = nextX;
-    currentY = nextY;
+    d += `C ${c1x} ${c1y}, ${c2x} ${c2y}, ${bx} ${by}`;
+    return d;
   }
-
-  const remainingDx = bx - currentX;
-  const remainingDy = by - currentY;
-
-  const xDir = Math.sign(remainingDx);
-  const yDir = Math.sign(remainingDy);
-
-  const curveStrength = laneWidth * 1; //1 = no offset
-
-  const c1x = currentX;
-  const c1y = currentY + yDir * curveStrength;
-
-  const c2x = bx;
-  const c2y = by - yDir * curveStrength;
-
-  d += `C ${c1x} ${c1y}, ${c2x} ${c2y}, ${bx} ${by}`;
-  return d;
-}
+  const lanesCount = useMemo(() => {
+  return Math.max(..._commits.map(c => c.lane), 0);
+}, [_commits]);
+  const width=useMemo(() => {
+      return lanesCount*lw+100;
+  },[lanesCount,lw])
   return (
-    <svg width={lanesCount * lw + 100} height={rh * _commits.length}>
+    <svg width={width} height={rh * _commits.length}>
       {_commits.flatMap((commit) =>
-        commit.prev.map((prevCommit) => {
-          const path = getPath(commit, prevCommit);
-
-          if (renderEdge) {
-            return renderEdge(commit, prevCommit, path);
-          }
+        commit.prev.map((prevCommit,index) => {
+            
+            if (renderEdge) {
+                return renderEdge(commit, prevCommit, index);
+            }
+            const path = getPath(commit, prevCommit);
 
           return (
             <path
-              key={`${commit.id}-${prevCommit.id}`}
+              key={`${commit.id}-${prevCommit.id}_${index}`}
               d={path}
               fill="none"
               stroke={
@@ -211,14 +234,14 @@ function getPath(
           );
         }),
       )}
-      {_commits.map((commit) => {
+      {_commits.map((commit,index) => {
         if (renderNode) {
-          return renderNode(commit);
+          return renderNode(commit,index);
         }
 
         return (
           <circle
-            key={commit.id}
+            key={`${commit.id}_${index}`}
             cx={commit.cx}
             cy={commit.cy}
             r={NODE_RADIUS}
