@@ -1,7 +1,7 @@
 {
   "name": "git-graph-svg",
   "private": false,
-  "version": "1.0.3",
+  "version": "1.0.4",
   "main": "dist/git-repo-graph.umd.js",
   "module": "dist/git-repo-graph.es.js",
   "types": "dist/index.d.ts",
