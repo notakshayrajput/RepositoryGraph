@@ -20,7 +20,7 @@ rendering.
 ------------------------------------------------------------------------
 
 ## 📐 Screenshots
-![Screenshot](./images//examples.png)
+![Screenshot](https://raw.githubusercontent.com/notakshayrajput/RepositoryGraph/refs/heads/main/images/examples.png)
 
 ## 🚀 Basic Usage
 
