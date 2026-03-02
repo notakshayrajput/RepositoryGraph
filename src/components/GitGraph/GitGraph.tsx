@@ -104,17 +104,17 @@ export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
     
       for (const parent of commit.parents) {
         const parentColor = colorPool.find((c) => c.branch === parent);
-        if (!parentColor || parentColor.index > branchColor.index) {   
-                if(branchColor.branch == commit.id)        
-                branchColor.branch = parent;
-            else {
-                var color = colorPool.find((c)=>!c.branch);
-                if(!color)color = getNewColor();
-                color.branch = parent;
-            }
-        //   break; 
+        if (!parentColor) {
+          // || parentColor.index > branchColor.index) {
+          if (branchColor.branch == commit.id) branchColor.branch = parent;
+          else {
+            var color = colorPool.find((c) => !c.branch);
+            if (!color) color = getNewColor();
+            color.branch = parent;
+          }
+          //   break;
         } else {
-          branchColor.branch = null;
+          branchColor.branch = parent;
         }
       }
 
@@ -139,7 +139,7 @@ export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
     });
     return _c;
   }, [commits, rh, lw]);
-  function getPath(from: _CommitItem, to: _CommitItem) {
+ function getPath(from: _CommitItem, to: _CommitItem) {
     //   const offset = 3 * (from.lane - to.lane);
     const ax = from.cx;
     const ay = from.cy;
@@ -148,8 +148,8 @@ export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
     const bx = to.cx;
     const by = to.cy;    
 
-    const laneWidth = lw/2 // lw * 0.01;
-    const rowHeight = (rh+ rh * 0.01)/2;
+    const laneWidth = lw/1 // lw * 0.01;
+    const rowHeight = (rh+ rh * 0.01)/1;
 
     const dx = bx - ax;
     const dy = by - ay ;
