@@ -19,6 +19,9 @@ rendering.
 
 ------------------------------------------------------------------------
 
+## 📐 Screenshots
+![Screenshot](./images//examples.png)
+
 ## 🚀 Basic Usage
 
 ``` tsx
