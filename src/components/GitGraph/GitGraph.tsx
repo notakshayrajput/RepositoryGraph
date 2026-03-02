@@ -13,11 +13,11 @@ export interface GitGraphSVGProps {
   colorPalette?: string[];
   laneWidth?: number;
 
-  renderNode?: (commit: _CommitItem,index?:number) => React.ReactNode;
+  renderNode?: (commit: _CommitItem, index?: number) => React.ReactNode;
   renderEdge?: (
     from: _CommitItem,
     to: _CommitItem,
-    index?: number
+    index?: number,
   ) => React.ReactNode;
 }
 type BranchColor = {
@@ -74,7 +74,6 @@ export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
       return c;
     }
   }
- 
   const _commits = useMemo(() => {
     var _c: _CommitItem[] = [];
 
@@ -101,7 +100,7 @@ export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
           }
         });
       }
-    
+
       for (const parent of commit.parents) {
         const parentColor = colorPool.find((c) => c.branch === parent);
         if (!parentColor) {
@@ -122,8 +121,6 @@ export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
       c.lane = branchColor.lane;
       c.cx = c.lane * lw - lw / 2;
       c.cy = rh * index + lw / 2;
-
-      
       _c.push(c);
 
       commitMap.set(c.id, c);
@@ -139,20 +136,21 @@ export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
     });
     return _c;
   }, [commits, rh, lw]);
- function getPath(from: _CommitItem, to: _CommitItem) {
+  function getPath(from: _CommitItem, to: _CommitItem) {
+    return `M ${from.cx} ${from.cy} L ${to.cx} ${to.cy}`;
+    // Implement the path generation logic in future, for now just connect straight lines
     //   const offset = 3 * (from.lane - to.lane);
     const ax = from.cx;
     const ay = from.cy;
 
-
     const bx = to.cx;
-    const by = to.cy;    
+    const by = to.cy;
 
-    const laneWidth = lw/1 // lw * 0.01;
-    const rowHeight = (rh+ rh * 0.01)/1;
+    const laneWidth = lw / 1; // lw * 0.01;
+    const rowHeight = (rh + rh * 0.01) / 1;
 
     const dx = bx - ax;
-    const dy = by - ay ;
+    const dy = by - ay;
 
     const xDirection = Math.sign(dx);
     const yDirection = Math.sign(dy);
@@ -175,7 +173,7 @@ export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
     for (let i = 0; i < steps; i++) {
       const nextX = currentX + xDirection * laneWidth;
       const nextY = currentY + stepHeight;
-    
+
       const c1x = currentX;
       const c1y = currentY + yDirection * curveSize;
 
@@ -206,20 +204,19 @@ export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
     return d;
   }
   const lanesCount = useMemo(() => {
-  return Math.max(..._commits.map(c => c.lane), 0);
-}, [_commits]);
-  const width=useMemo(() => {
-      return lanesCount*lw+100;
-  },[lanesCount,lw])
+    return Math.max(..._commits.map((c) => c.lane), 0);
+  }, [_commits]);
+  const width = useMemo(() => {
+    return lanesCount * lw + 100;
+  }, [lanesCount, lw]);
   return (
     <svg width={width} height={rh * _commits.length}>
       {_commits.flatMap((commit) =>
-        commit.prev.map((prevCommit,index) => {
-            
-            if (renderEdge) {
-                return renderEdge(commit, prevCommit, index);
-            }
-            const path = getPath(commit, prevCommit);
+        commit.prev.map((prevCommit, index) => {
+          if (renderEdge) {
+            return renderEdge(commit, prevCommit, index);
+          }
+          const path = getPath(commit, prevCommit);
 
           return (
             <path
@@ -234,9 +231,9 @@ export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
           );
         }),
       )}
-      {_commits.map((commit,index) => {
+      {_commits.map((commit, index) => {
         if (renderNode) {
-          return renderNode(commit,index);
+          return renderNode(commit, index);
         }
 
         return (
