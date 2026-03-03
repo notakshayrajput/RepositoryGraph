@@ -1,7 +1,7 @@
 {
-  "name": "@akshay-rajput/git-graph-svg",
+  "name": "git-graph-svg",
   "private": false,
-  "version": "1.0.8",
+  "version": "2.0.0",
   "main": "dist/git-repo-graph.umd.js",
   "module": "dist/git-repo-graph.es.js",
   "types": "dist/index.d.ts",
