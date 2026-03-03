@@ -1,5 +1,5 @@
 {
-  "name": "git-graph-svg",
+  "name": "@akshay-rajput/git-graph-svg",
   "private": false,
   "version": "1.0.8",
   "main": "dist/git-repo-graph.umd.js",

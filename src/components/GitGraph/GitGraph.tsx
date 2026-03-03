@@ -1,252 +1,354 @@
-import React, { useEffect, useMemo, useRef } from "react";
-export interface CommitItem {
+import React, { ReactNode, useEffect, useMemo, useRef } from "react";
+import { svgUtils } from "./util";
+export interface ICommitItem {
   id: string;
   message: string;
   author: string;
   date: string;
   parents: string[];
+  meta?: any;
 }
-
-export interface GitGraphSVGProps {
-  commits: CommitItem[];
-  rowHeight?: number;
+export interface GitGraphProps {
+  commits: ICommitItem[];
   colorPalette?: string[];
+  rowHeight?: number;
   laneWidth?: number;
-
-  renderNode?: (commit: _CommitItem, index?: number) => React.ReactNode;
-  renderEdge?: (
-    from: _CommitItem,
-    to: _CommitItem,
-    commits: _CommitItem[],
-    index?: number,
-  ) => React.ReactNode;
+  renderNode?: (
+    x: number,
+    y: number,
+    color: string,
+    commit: ICommitItem,
+  ) => ReactNode;
+  renderEdge?: (d: string, color: string) => ReactNode;
+  getMergeCurve?: (x1: number, y1: number, x2: number, y2: number) => string;
+  getBranchSplitCurve?: (
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+  ) => string;
 }
-type BranchColor = {
+type Branch = {
   color: string;
-  branch: string | null;
-  lane: number;
-  index: number;
+  xIndex: number;
+  lastxy: {
+    x: number;
+    y: number;
+  };
+  pathStr: string;
+  toBeClosed?: string[];
 };
-export interface _CommitItem extends CommitItem {
+
+type BranchPool = Record<string, Branch>;
+type CompletedPath = {
+  d: string;
   color: string;
-  lane: number;
-  cx: number;
-  cy: number;
-  prev: _CommitItem[];
-  index: number;
-}
+};
+const DEFAULT_COLORPALETTE = [
+  "#3a86ff",
+  "#8338ec",
+  "#ff006e",
+  "#fb5607",
+  "#ffbe0b",
+  "#3affbd",
+  "#adec38",
+  "#ff009d",
+  "#fb7507",
+  "#0b38ff",
+];
+const DEFAULT_RADIUS = 5;
+const DEFAULT_ROWHEIGHT = 35;
+const DEFAULT_LANEWIDTH = 35;
+const DEFAULT_OFFSETX = 25;
+const DEFAULT_OFFSETY = 25;
+const DEFAULT_EDGEWIDTH = 2;
+const GitGraph: React.FC<GitGraphProps> = (props) => {
+  const {
+    commits,
+    colorPalette: _colorPalette,
+    rowHeight: _rowHeight,
+    laneWidth: _laneWidth,
+    renderNode,
+    renderEdge,
+    getMergeCurve,
+    getBranchSplitCurve,
+  } = props;
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const colorPalette = _colorPalette || DEFAULT_COLORPALETTE;
+  const rowHeight = _rowHeight || DEFAULT_ROWHEIGHT;
+  const laneWidth = _laneWidth || DEFAULT_LANEWIDTH;
+const { nodes, edges } = useMemo<{nodes:ReactNode[],edges:ReactNode[]}>(() => {
+    // if (!svgRef.current) return {nodes:[],edges:[]};
+    
+  const nodes: React.ReactNode[] = [];
+  const edges: React.ReactNode[] = [];
+    // const layerLines = svgRef.current.querySelector("#layer-lines")!;
+    // const layerPoints = svgRef.current.querySelector("#layer-points")!;
+    // layerLines.innerHTML = "";
+    // layerPoints.innerHTML = "";
+    // --- State & Config ---
+    let branchPool: BranchPool = {};
+    let completedPaths: CompletedPath[] = [];
+    let colorCounter = 0;
 
-//Defaults
-const LANE_WIDTH = 50;
-const NODE_RADIUS = 5;
-const COLOR_PALETTE = ["#3a86ff", "#8338ec", "#ff006e", "#fb5607", "#ffbe0b"];
-export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
-  commits,
-  rowHeight,
-  colorPalette,
-  laneWidth,
-  renderNode,
-  renderEdge,
-}) => {
-  const lw = laneWidth || LANE_WIDTH;
-  const rh = rowHeight || LANE_WIDTH;
-  const colorPool: BranchColor[] = useMemo(
-    () =>
-      (colorPalette || COLOR_PALETTE).map((color, index) => ({
-        color,
-        branch: null,
-        lane: index + 1,
-        index,
-      })),
-    [colorPalette, commits],
-  );
-  function getNewColor(): BranchColor {
-    var index = colorPool.findIndex((c) => !c.branch);
-    if (index > -1) {
-      return colorPool[index];
-    } else {
-      var c = {
-        color: "#" + Math.floor(Math.random() * 16777215).toString(16),
-        branch: null,
-        lane: colorPool.length + 1,
-        index,
-      };
-      colorPool.push(c);
-      return c;
+    function getCurveTop(x1: number, y1: number, x2: number, y2: number) {
+      if (getMergeCurve) return getMergeCurve(x1, y1, x2, y2);
+      else return svgUtils.getCurveTop(x1, y1, x2, y2);
     }
-  }
-  const _commits = useMemo(() => {
-    var _c: _CommitItem[] = [];
-
-    const commitMap = new Map<string, _CommitItem>();
-
-    commits.forEach((commit, index) => {
-      var c: _CommitItem = {
-        ...commit,
-        color: "",
-        lane: 0,
-        cx: 0,
-        cy: 0,
-        prev: [], // initialize empty
-        index
-      };
-      var branchColor = colorPool.find((c) => c.branch == commit.id);
-      if (!branchColor) {
-        branchColor = getNewColor();
+    function getCurveBottom(x1: number, y1: number, x2: number, y2: number) {
+      if (getBranchSplitCurve) return getBranchSplitCurve(x1, y1, x2, y2);
+      return svgUtils.getCurveBottom(x1, y1, x2, y2);
+    }
+    function drawFinalPath(
+      edges: React.ReactNode[], d: string, color: string, width = 2) {
+      if (renderEdge) {
+        let path = renderEdge(d, color);
+        edges.push(path);
       } else {
-        //Free up any other color that has same branch id// when two branches emerge from same parent branch
-        colorPool.forEach((c) => {
-          if (c.branch === commit.id && c.index !== branchColor?.index) {
-            c.branch = null;
-          }
+        let path = svgUtils.drawFinalPath(d, color, width);
+
+        edges.push(path);
+      }
+    }
+    function drawPoint(
+      nodes: React.ReactNode[],
+      x: number,
+      y: number,
+      color: string,
+      commit: ICommitItem,
+    ) {
+      if (renderNode) {
+        let node = renderNode(x, y, color, commit);
+        nodes.push(node);
+      } else {
+        let node = svgUtils.drawPoint(x, y, color, commit);
+        nodes.push(node);
+      }
+    }
+    function assignNewBranch() {
+      const activeBranches = Object.values(branchPool);
+      const occupied = new Set(activeBranches.map((b: any) => b.xIndex));
+      let lane = 0;
+      while (occupied.has(lane)) lane++;
+      return {
+        color: colorPalette[colorCounter++ % colorPalette.length],
+        xIndex: lane,
+      };
+    }
+
+    function compactLanes() {
+      const activeKeys = Object.keys(branchPool);
+      const occupiedLanes = new Set();
+      activeKeys
+        .filter((k) => k.startsWith("merge_"))
+        .forEach((k) => {
+          occupiedLanes.add(branchPool[k].xIndex);
         });
-      }
-
-      for (const parent of commit.parents) {
-        const parentColor = colorPool.find((c) => c.branch === parent);
-        if (!parentColor) {
-          // || parentColor.index > branchColor.index) {
-          if (branchColor.branch == commit.id) branchColor.branch = parent;
-          else {
-            var color = colorPool.find((c) => !c.branch);
-            if (!color) color = getNewColor();
-            color.branch = parent;
-          }
-          //   break;
-        } else {
-          branchColor.branch = parent;
+      const realBranches = activeKeys
+        .filter((k) => !k.startsWith("merge_"))
+        .map((k) => branchPool[k]);
+      realBranches.sort((a, b) => a.xIndex - b.xIndex);
+      for (const branch of realBranches) {
+        let targetLane = 0;
+        while (occupiedLanes.has(targetLane)) {
+          targetLane++;
         }
+        if (targetLane < branch.xIndex) {
+          branch.xIndex = targetLane;
+        }
+        occupiedLanes.add(branch.xIndex);
+      }
+    }
+
+    function drawActiveBranches(currentY: number, skipCommitId: string) {
+      let skipKeys = new Set<string>();
+      let terminatingBranch = branchPool[skipCommitId];
+      if (terminatingBranch) {
+        skipKeys.add(skipCommitId);
+        if (terminatingBranch.toBeClosed)
+          terminatingBranch.toBeClosed.forEach((k: string) => skipKeys.add(k));
       }
 
-      c.color = branchColor.color; //Save color in commit
-      c.lane = branchColor.lane;
-      c.cx = c.lane * lw - lw / 2;
-      c.cy = rh * index + lw / 2;
-      _c.push(c);
-
-      commitMap.set(c.id, c);
-    });
-    // STEP 2: Assign prev references
-    _c.forEach((commit) => {
-      commit.parents.forEach((parentId) => {
-        const parentCommit = commitMap.get(parentId);
-        if (parentCommit) {
-          parentCommit.prev.push(commit);
+      Object.keys(branchPool).forEach((key) => {
+        if (skipKeys.has(key)) return;
+        const info = branchPool[key];
+        const targetX = info.xIndex * laneWidth + DEFAULT_OFFSETX;
+        if (info.lastxy.y !== currentY) {
+          if (info.lastxy.x !== targetX) {
+            info.pathStr += getCurveTop(
+              info.lastxy.x,
+              info.lastxy.y,
+              targetX,
+              currentY,
+            );
+          } else {
+            info.pathStr += ` L ${targetX} ${currentY}`;
+          }
+          info.lastxy = { x: targetX, y: currentY };
         }
       });
-    });
-    return _c;
-  }, [commits, rh, lw]);
-  function getPath(from: _CommitItem, to: _CommitItem) {
-    return `M ${from.cx} ${from.cy} L ${to.cx} ${to.cy}`;
-    // Implement the path generation logic in future, for now just connect straight lines
-    //   const offset = 3 * (from.lane - to.lane);
-    const ax = from.cx;
-    const ay = from.cy;
-
-    const bx = to.cx;
-    const by = to.cy;
-
-    const laneWidth = lw / 1; // lw * 0.01;
-    const rowHeight = (rh + rh * 0.01) / 1;
-
-    const dx = bx - ax;
-    const dy = by - ay;
-
-    const xDirection = Math.sign(dx);
-    const yDirection = Math.sign(dy);
-
-    const totalLaneShiftX = Math.abs(dx);
-    const totalLaneShiftY = Math.abs(dy);
-    const steps = Math.min(
-      Math.floor(totalLaneShiftX / laneWidth),
-      Math.floor(totalLaneShiftY / rowHeight),
-    );
-    const stepHeight = rowHeight * yDirection;
-    const curveSize = laneWidth * 1; //1=no offset
-
-    let currentX = ax;
-    let currentY = ay;
-
-    let d = `M ${currentX} ${currentY} `;
-
-    // Step lane-by-lane
-    for (let i = 0; i < steps; i++) {
-      const nextX = currentX + xDirection * laneWidth;
-      const nextY = currentY + stepHeight;
-
-      const c1x = currentX;
-      const c1y = currentY + yDirection * curveSize;
-
-      const c2x = nextX;
-      const c2y = nextY - yDirection * curveSize;
-
-      d += `C ${c1x} ${c1y}, ${c2x} ${c2y}, ${nextX} ${nextY} `;
-
-      currentX = nextX;
-      currentY = nextY;
     }
 
-    const remainingDx = bx - currentX;
-    const remainingDy = by - currentY;
+    function processNode(commit: any) {
+      let arrivingBranch = branchPool[commit.id];
+      let currentLane = 0;
+      let currentColor = "";
 
-    const xDir = Math.sign(remainingDx);
-    const yDir = Math.sign(remainingDy);
+      if (!arrivingBranch) {
+        let newBranch = assignNewBranch();
+        currentLane = newBranch.xIndex;
+        currentColor = newBranch.color;
+      } else {
+        currentLane = arrivingBranch.xIndex;
+        currentColor = arrivingBranch.color;
+      }
 
-    const curveStrength = laneWidth * 1; //1 = no offset
+      const x = currentLane * laneWidth + DEFAULT_OFFSETX;
+      const y = commit.meta.yIndex * rowHeight + DEFAULT_OFFSETY;
 
-    const c1x = currentX;
-    const c1y = currentY + yDir * curveStrength;
+      drawActiveBranches(y, commit.id);
 
-    const c2x = bx;
-    const c2y = by - yDir * curveStrength;
-
-    d += `C ${c1x} ${c1y}, ${c2x} ${c2y}, ${bx} ${by}`;
-    return d;
-  }
-  const lanesCount = useMemo(() => {
-    return Math.max(..._commits.map((c) => c.lane), 0);
-  }, [_commits]);
-  const width = useMemo(() => {
-    return lanesCount * lw + 100;
-  }, [lanesCount, lw]);
-  return (
-    <svg width={width} height={rh * _commits.length}>
-      {_commits.flatMap((commit) =>
-        commit.prev.map((prevCommit, index) => {
-          if (renderEdge) {
-            return renderEdge(commit, prevCommit, _commits,index);
-          }
-          const path = getPath(commit, prevCommit);
-
-          return (
-            <path
-              key={`${commit.id}-${prevCommit.id}_${index}`}
-              d={path}
-              fill="none"
-              stroke={
-                commit.lane <= prevCommit.lane ? prevCommit.color : commit.color
-              }
-              strokeWidth={2}
-            />
+      if (arrivingBranch) {
+        if (arrivingBranch.lastxy.y !== y || arrivingBranch.lastxy.x !== x) {
+          arrivingBranch.pathStr += getCurveBottom(
+            arrivingBranch.lastxy.x,
+            arrivingBranch.lastxy.y,
+            x,
+            y,
           );
-        }),
-      )}
-      {_commits.map((commit, index) => {
-        if (renderNode) {
-          return renderNode(commit, index);
         }
+        completedPaths.push({
+          d: arrivingBranch.pathStr,
+          color: arrivingBranch.color,
+        });
 
-        return (
-          <circle
-            key={`${commit.id}_${index}`}
-            cx={commit.cx}
-            cy={commit.cy}
-            r={NODE_RADIUS}
-            fill={commit.color}
-          />
-        );
-      })}
-    </svg>
+        if (arrivingBranch.toBeClosed) {
+          arrivingBranch.toBeClosed.forEach((key: string) => {
+            let mergingBranch = branchPool[key];
+            if (mergingBranch) {
+              if (
+                mergingBranch.lastxy.y !== y ||
+                mergingBranch.lastxy.x !== x
+              ) {
+                mergingBranch.pathStr += getCurveBottom(
+                  mergingBranch.lastxy.x,
+                  mergingBranch.lastxy.y,
+                  x,
+                  y,
+                );
+              }
+              completedPaths.push({
+                d: mergingBranch.pathStr,
+                color: mergingBranch.color,
+              });
+              delete branchPool[key];
+            }
+          });
+        }
+        delete branchPool[commit.id];
+      }
+      drawPoint(nodes, x, y, currentColor, commit);
+
+      if (commit.parents.length > 0) {
+        let primaryParentId = commit.parents[0];
+        if (!branchPool[primaryParentId]) {
+          branchPool[primaryParentId] = {
+            color: currentColor,
+            xIndex: currentLane,
+            lastxy: { x, y },
+            pathStr: `M ${x} ${y}`, // Creates a fresh string for the parent
+          };
+        } else {
+          let existing = branchPool[primaryParentId];
+          if (currentLane < existing.xIndex) {
+            let dummyKey = `merge_${commit.id}_${primaryParentId}_${existing.xIndex}`;
+            branchPool[dummyKey] = existing;
+            branchPool[primaryParentId] = {
+              color: currentColor,
+              xIndex: currentLane,
+              lastxy: { x, y },
+              pathStr: `M ${x} ${y}`, // Creates a fresh string
+              toBeClosed: existing.toBeClosed
+                ? [...existing.toBeClosed, dummyKey]
+                : [dummyKey],
+            };
+            delete existing.toBeClosed;
+          } else {
+            let dummyKey = `merge_${commit.id}_${primaryParentId}_${currentLane}`;
+            branchPool[dummyKey] = {
+              color: currentColor,
+              xIndex: currentLane,
+              lastxy: { x, y },
+              pathStr: `M ${x} ${y}`, // Creates a fresh string
+            };
+            if (!branchPool[primaryParentId].toBeClosed)
+              branchPool[primaryParentId].toBeClosed = [];
+            branchPool[primaryParentId].toBeClosed.push(dummyKey);
+          }
+        }
+        for (let i = 1; i < commit.parents.length; i++) {
+          let parentId = commit.parents[i];
+          let targetLane = currentLane + i;
+          Object.values(branchPool).forEach((b) => {
+            if (b.xIndex >= targetLane) b.xIndex++;
+          });
+
+          let newColor = colorPalette[colorCounter++ % colorPalette.length];
+          let incomingBranch = {
+            color: newColor,
+            xIndex: targetLane,
+            lastxy: { x, y },
+            pathStr: `M ${x} ${y}`, // Creates a fresh string
+          };
+
+          if (!branchPool[parentId]) {
+            branchPool[parentId] = incomingBranch;
+          } else {
+            let dummyKey = `merge_${commit.id}_${parentId}_${targetLane}`;
+            incomingBranch.color = branchPool[parentId].color;
+            branchPool[dummyKey] = incomingBranch;
+            if (!branchPool[parentId].toBeClosed)
+              branchPool[parentId].toBeClosed = [];
+            branchPool[parentId].toBeClosed.push(dummyKey);
+          }
+        }
+      }
+
+      compactLanes();
+    }
+
+    commits.sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    );
+    commits.forEach((commit, index) => {
+      commit.meta = { yIndex: index };
+    });
+
+    commits.forEach((commit) => {
+      processNode(commit);
+    });
+
+    completedPaths.forEach((path) => {
+      drawFinalPath(edges, path.d, path.color, DEFAULT_EDGEWIDTH);
+    });
+    return { nodes, edges };
+  }, [{ ...props }]);
+  return (
+    <>
+      <svg
+        // ref={svgRef}
+        height={rowHeight * commits.length + DEFAULT_OFFSETY}
+        style={{}}
+      >
+        <g id="layer-lines">
+          {edges}
+        </g>
+        <g id="layer-points" >
+          {nodes}
+        </g>
+      </svg>
+    </>
   );
 };
+
+export { GitGraph };
