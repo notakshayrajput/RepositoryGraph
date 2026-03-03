@@ -17,6 +17,7 @@ export interface GitGraphSVGProps {
   renderEdge?: (
     from: _CommitItem,
     to: _CommitItem,
+    commits: _CommitItem[],
     index?: number,
   ) => React.ReactNode;
 }
@@ -214,7 +215,7 @@ export const GitGraphSVG: React.FC<GitGraphSVGProps> = ({
       {_commits.flatMap((commit) =>
         commit.prev.map((prevCommit, index) => {
           if (renderEdge) {
-            return renderEdge(commit, prevCommit, index);
+            return renderEdge(commit, prevCommit, _commits,index);
           }
           const path = getPath(commit, prevCommit);
 
