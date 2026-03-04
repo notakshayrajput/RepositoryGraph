@@ -1,4 +1,4 @@
-import React, { ReactNode, useEffect, useMemo, useRef } from "react";
+import React, { forwardRef, ReactNode, useEffect, useMemo, useRef } from "react";
 import { svgUtils } from "./util";
 export interface ICommitItem {
   id: string;
@@ -13,6 +13,7 @@ export interface GitGraphProps {
   colorPalette?: string[];
   rowHeight?: number;
   laneWidth?: number;
+  style?: React.CSSProperties;
   renderNode?: (
     x: number,
     y: number,
@@ -62,26 +63,33 @@ const DEFAULT_LANEWIDTH = 35;
 const DEFAULT_OFFSETX = 25;
 const DEFAULT_OFFSETY = 25;
 const DEFAULT_EDGEWIDTH = 2;
-const GitGraph: React.FC<GitGraphProps> = (props) => {
-  const {
+// const GitGraph: React.FC<GitGraphProps> = (props) => {
+const GitGraph = forwardRef<SVGSVGElement, GitGraphProps>((props, ref) => {
+const {
     commits,
     colorPalette: _colorPalette,
     rowHeight: _rowHeight,
     laneWidth: _laneWidth,
+    style,
     renderNode,
     renderEdge,
     getMergeCurve,
     getBranchSplitCurve,
   } = props;
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const [svgWidth, setSVGWidth] = React.useState(0); 
+  let computedWidth = 0;
   const colorPalette = _colorPalette || DEFAULT_COLORPALETTE;
   const rowHeight = _rowHeight || DEFAULT_ROWHEIGHT;
   const laneWidth = _laneWidth || DEFAULT_LANEWIDTH;
-const { nodes, edges } = useMemo<{nodes:ReactNode[],edges:ReactNode[]}>(() => {
+  const { nodes, edges } = useMemo<{
+    nodes: ReactNode[];
+    edges: ReactNode[];
+  }>(() => {
     // if (!svgRef.current) return {nodes:[],edges:[]};
-    
-  const nodes: React.ReactNode[] = [];
-  const edges: React.ReactNode[] = [];
+
+    const nodes: React.ReactNode[] = [];
+    const edges: React.ReactNode[] = [];
     // const layerLines = svgRef.current.querySelector("#layer-lines")!;
     // const layerPoints = svgRef.current.querySelector("#layer-points")!;
     // layerLines.innerHTML = "";
@@ -92,15 +100,21 @@ const { nodes, edges } = useMemo<{nodes:ReactNode[],edges:ReactNode[]}>(() => {
     let colorCounter = 0;
 
     function getCurveTop(x1: number, y1: number, x2: number, y2: number) {
+      computedWidth = Math.max(computedWidth, x2,x1);
       if (getMergeCurve) return getMergeCurve(x1, y1, x2, y2);
       else return svgUtils.getCurveTop(x1, y1, x2, y2);
     }
     function getCurveBottom(x1: number, y1: number, x2: number, y2: number) {
+      computedWidth=Math.max(computedWidth, x2,x1);
       if (getBranchSplitCurve) return getBranchSplitCurve(x1, y1, x2, y2);
       return svgUtils.getCurveBottom(x1, y1, x2, y2);
     }
     function drawFinalPath(
-      edges: React.ReactNode[], d: string, color: string, width = 2) {
+      edges: React.ReactNode[],
+      d: string,
+      color: string,
+      width = 2,
+    ) {
       if (renderEdge) {
         let path = renderEdge(d, color);
         edges.push(path);
@@ -117,6 +131,7 @@ const { nodes, edges } = useMemo<{nodes:ReactNode[],edges:ReactNode[]}>(() => {
       color: string,
       commit: ICommitItem,
     ) {
+      computedWidth=Math.max(computedWidth, x);
       if (renderNode) {
         let node = renderNode(x, y, color, commit);
         nodes.push(node);
@@ -333,22 +348,23 @@ const { nodes, edges } = useMemo<{nodes:ReactNode[],edges:ReactNode[]}>(() => {
     });
     return { nodes, edges };
   }, [{ ...props }]);
+
+  useEffect(() => {
+    setSVGWidth(computedWidth+DEFAULT_OFFSETX);
+  },[computedWidth])
   return (
     <>
       <svg
-        // ref={svgRef}
-        height={rowHeight * commits.length + DEFAULT_OFFSETY}
-        style={{}}
+        ref={ref}
+        height={rowHeight * commits.length }
+        width={svgWidth}
+        style={style}
       >
-        <g id="layer-lines">
-          {edges}
-        </g>
-        <g id="layer-points" >
-          {nodes}
-        </g>
+        <g id="layer-lines">{edges}</g>
+        <g id="layer-points">{nodes}</g>
       </svg>
     </>
   );
-};
+});
 
 export { GitGraph };
