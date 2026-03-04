@@ -1,4 +1,10 @@
-import React, { forwardRef, ReactNode, useEffect, useMemo, useRef } from "react";
+import React, {
+  forwardRef,
+  ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
 import { svgUtils } from "./util";
 export interface ICommitItem {
   id: string;
@@ -65,7 +71,7 @@ const DEFAULT_OFFSETY = 25;
 const DEFAULT_EDGEWIDTH = 2;
 // const GitGraph: React.FC<GitGraphProps> = (props) => {
 const GitGraph = forwardRef<SVGSVGElement, GitGraphProps>((props, ref) => {
-const {
+  const {
     commits,
     colorPalette: _colorPalette,
     rowHeight: _rowHeight,
@@ -77,7 +83,7 @@ const {
     getBranchSplitCurve,
   } = props;
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const [svgWidth, setSVGWidth] = React.useState(0); 
+  const [svgWidth, setSVGWidth] = React.useState(0);
   let computedWidth = 0;
   const colorPalette = _colorPalette || DEFAULT_COLORPALETTE;
   const rowHeight = _rowHeight || DEFAULT_ROWHEIGHT;
@@ -100,12 +106,12 @@ const {
     let colorCounter = 0;
 
     function getCurveTop(x1: number, y1: number, x2: number, y2: number) {
-      computedWidth = Math.max(computedWidth, x2,x1);
+      computedWidth = Math.max(computedWidth, x2, x1);
       if (getMergeCurve) return getMergeCurve(x1, y1, x2, y2);
       else return svgUtils.getCurveTop(x1, y1, x2, y2);
     }
     function getCurveBottom(x1: number, y1: number, x2: number, y2: number) {
-      computedWidth=Math.max(computedWidth, x2,x1);
+      computedWidth = Math.max(computedWidth, x2, x1);
       if (getBranchSplitCurve) return getBranchSplitCurve(x1, y1, x2, y2);
       return svgUtils.getCurveBottom(x1, y1, x2, y2);
     }
@@ -131,7 +137,7 @@ const {
       color: string,
       commit: ICommitItem,
     ) {
-      computedWidth=Math.max(computedWidth, x);
+      computedWidth = Math.max(computedWidth, x);
       if (renderNode) {
         let node = renderNode(x, y, color, commit);
         nodes.push(node);
@@ -336,7 +342,20 @@ const {
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
     );
     commits.forEach((commit, index) => {
-      commit.meta = { yIndex: index };
+      if (commit.meta == null) {
+        commit.meta = { yIndex: index, prev: [] };
+      }
+      commit.meta.yIndex = index;
+      commit.parents.forEach((parentId) => {
+        var parentIndex = commits.findIndex((c) => c.id === parentId);
+        if (parentIndex > -1) {
+          var parent = commits[parentIndex];
+          if (parent.meta == null) {
+            parent.meta = { yIndex: parentIndex, prev: [] };
+          }
+          if(parent.meta.prev.indexOf(commit.id) < 0) parent.meta.prev.push(commit.id);
+        }
+      });
     });
 
     commits.forEach((commit) => {
@@ -350,13 +369,13 @@ const {
   }, [{ ...props }]);
 
   useEffect(() => {
-    setSVGWidth(computedWidth+DEFAULT_OFFSETX);
-  },[computedWidth])
+    setSVGWidth(computedWidth + DEFAULT_OFFSETX);
+  }, [computedWidth]);
   return (
     <>
       <svg
         ref={ref}
-        height={rowHeight * commits.length }
+        height={rowHeight * commits.length}
         width={svgWidth}
         style={style}
       >
