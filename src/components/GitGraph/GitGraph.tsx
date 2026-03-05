@@ -17,6 +17,7 @@ export interface ICommitItem {
 export interface GitGraphProps {
   commits: ICommitItem[];
   colorPalette?: string[];
+  padding?: {left:number,right:number,bottom:number,top:number} | number;
   rowHeight?: number;
   laneWidth?: number;
   style?: React.CSSProperties;
@@ -63,7 +64,6 @@ const DEFAULT_COLORPALETTE = [
   "#fb7507",
   "#0b38ff",
 ];
-const DEFAULT_RADIUS = 5;
 const DEFAULT_ROWHEIGHT = 35;
 const DEFAULT_LANEWIDTH = 35;
 const DEFAULT_OFFSETX = 25;
@@ -81,6 +81,7 @@ const GitGraph = forwardRef<SVGSVGElement, GitGraphProps>((props, ref) => {
     renderEdge,
     getMergeCurve,
     getBranchSplitCurve,
+    padding
   } = props;
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [svgWidth, setSVGWidth] = React.useState(0);
@@ -88,6 +89,7 @@ const GitGraph = forwardRef<SVGSVGElement, GitGraphProps>((props, ref) => {
   const colorPalette = _colorPalette || DEFAULT_COLORPALETTE;
   const rowHeight = _rowHeight || DEFAULT_ROWHEIGHT;
   const laneWidth = _laneWidth || DEFAULT_LANEWIDTH;
+  const _padding = typeof padding === 'number' ? {left:padding,right:padding,bottom:padding,top:padding} : padding || {left:DEFAULT_OFFSETX,right:DEFAULT_OFFSETX,bottom:DEFAULT_OFFSETY,top:DEFAULT_OFFSETY};
   const { nodes, edges } = useMemo<{
     nodes: ReactNode[];
     edges: ReactNode[];
@@ -193,7 +195,7 @@ const GitGraph = forwardRef<SVGSVGElement, GitGraphProps>((props, ref) => {
       Object.keys(branchPool).forEach((key) => {
         if (skipKeys.has(key)) return;
         const info = branchPool[key];
-        const targetX = info.xIndex * laneWidth + DEFAULT_OFFSETX;
+        const targetX = info.xIndex * laneWidth + _padding.left;
         if (info.lastxy.y !== currentY) {
           if (info.lastxy.x !== targetX) {
             info.pathStr += getCurveTop(
@@ -224,8 +226,8 @@ const GitGraph = forwardRef<SVGSVGElement, GitGraphProps>((props, ref) => {
         currentColor = arrivingBranch.color;
       }
 
-      const x = currentLane * laneWidth + DEFAULT_OFFSETX;
-      const y = commit.meta.yIndex * rowHeight + DEFAULT_OFFSETY;
+      const x = currentLane * laneWidth + _padding.left;
+      const y = commit.meta.yIndex * rowHeight + _padding.top;
 
       drawActiveBranches(y, commit.id);
 
@@ -369,13 +371,13 @@ const GitGraph = forwardRef<SVGSVGElement, GitGraphProps>((props, ref) => {
   }, [{ ...props }]);
 
   useEffect(() => {
-    setSVGWidth(computedWidth + DEFAULT_OFFSETX);
+    setSVGWidth(computedWidth + _padding.right);
   }, [computedWidth]);
   return (
     <>
       <svg
         ref={ref}
-        height={rowHeight * commits.length}
+        height={rowHeight * commits.length + _padding.bottom}
         width={svgWidth}
         style={style}
       >
