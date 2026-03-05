@@ -17,7 +17,9 @@ export interface ICommitItem {
 export interface GitGraphProps {
   commits: ICommitItem[];
   colorPalette?: string[];
-  padding?: {left:number,right:number,bottom:number,top:number} | number;
+  padding?:
+    | { left: number; right: number; bottom: number; top: number }
+    | number;
   rowHeight?: number;
   laneWidth?: number;
   style?: React.CSSProperties;
@@ -27,7 +29,12 @@ export interface GitGraphProps {
     color: string,
     commit: ICommitItem,
   ) => ReactNode;
-  renderEdge?: (d: string, color: string) => ReactNode;
+  renderEdge?: (
+    from: ICommitItem,
+    to: ICommitItem,
+    d: string,
+    color: string,
+  ) => ReactNode;
   getMergeCurve?: (x1: number, y1: number, x2: number, y2: number) => string;
   getBranchSplitCurve?: (
     x1: number,
@@ -45,12 +52,15 @@ type Branch = {
   };
   pathStr: string;
   toBeClosed?: string[];
+  from: ICommitItem;
 };
 
 type BranchPool = Record<string, Branch>;
 type CompletedPath = {
   d: string;
   color: string;
+  from: ICommitItem;
+  to: ICommitItem;
 };
 const DEFAULT_COLORPALETTE = [
   "#3a86ff",
@@ -81,27 +91,28 @@ const GitGraph = forwardRef<SVGSVGElement, GitGraphProps>((props, ref) => {
     renderEdge,
     getMergeCurve,
     getBranchSplitCurve,
-    padding
+    padding,
   } = props;
-  const svgRef = useRef<SVGSVGElement | null>(null);
   const [svgWidth, setSVGWidth] = React.useState(0);
   let computedWidth = 0;
   const colorPalette = _colorPalette || DEFAULT_COLORPALETTE;
   const rowHeight = _rowHeight || DEFAULT_ROWHEIGHT;
   const laneWidth = _laneWidth || DEFAULT_LANEWIDTH;
-  const _padding = typeof padding === 'number' ? {left:padding,right:padding,bottom:padding,top:padding} : padding || {left:DEFAULT_OFFSETX,right:DEFAULT_OFFSETX,bottom:DEFAULT_OFFSETY,top:DEFAULT_OFFSETY};
+  const _padding =
+    typeof padding === "number"
+      ? { left: padding, right: padding, bottom: padding, top: padding }
+      : padding || {
+          left: DEFAULT_OFFSETX,
+          right: DEFAULT_OFFSETX,
+          bottom: DEFAULT_OFFSETY,
+          top: DEFAULT_OFFSETY,
+        };
   const { nodes, edges } = useMemo<{
     nodes: ReactNode[];
     edges: ReactNode[];
   }>(() => {
-    // if (!svgRef.current) return {nodes:[],edges:[]};
-
     const nodes: React.ReactNode[] = [];
     const edges: React.ReactNode[] = [];
-    // const layerLines = svgRef.current.querySelector("#layer-lines")!;
-    // const layerPoints = svgRef.current.querySelector("#layer-points")!;
-    // layerLines.innerHTML = "";
-    // layerPoints.innerHTML = "";
     // --- State & Config ---
     let branchPool: BranchPool = {};
     let completedPaths: CompletedPath[] = [];
@@ -121,14 +132,20 @@ const GitGraph = forwardRef<SVGSVGElement, GitGraphProps>((props, ref) => {
       edges: React.ReactNode[],
       d: string,
       color: string,
-      width = 2,
+      from: ICommitItem,
+      to: ICommitItem,
     ) {
       if (renderEdge) {
-        let path = renderEdge(d, color);
+        let path = renderEdge(from, to, d, color);
         edges.push(path);
       } else {
-        let path = svgUtils.drawFinalPath(d, color, width);
-
+        let path = svgUtils.drawFinalPath(
+          d,
+          color,
+          DEFAULT_EDGEWIDTH,
+          from,
+          to,
+        );
         edges.push(path);
       }
     }
@@ -243,6 +260,8 @@ const GitGraph = forwardRef<SVGSVGElement, GitGraphProps>((props, ref) => {
         completedPaths.push({
           d: arrivingBranch.pathStr,
           color: arrivingBranch.color,
+          from: arrivingBranch.from,
+          to: commit,
         });
 
         if (arrivingBranch.toBeClosed) {
@@ -263,6 +282,8 @@ const GitGraph = forwardRef<SVGSVGElement, GitGraphProps>((props, ref) => {
               completedPaths.push({
                 d: mergingBranch.pathStr,
                 color: mergingBranch.color,
+                from: mergingBranch.from,
+                to: commit,
               });
               delete branchPool[key];
             }
@@ -280,6 +301,7 @@ const GitGraph = forwardRef<SVGSVGElement, GitGraphProps>((props, ref) => {
             xIndex: currentLane,
             lastxy: { x, y },
             pathStr: `M ${x} ${y}`, // Creates a fresh string for the parent
+            from: commit,
           };
         } else {
           let existing = branchPool[primaryParentId];
@@ -294,6 +316,7 @@ const GitGraph = forwardRef<SVGSVGElement, GitGraphProps>((props, ref) => {
               toBeClosed: existing.toBeClosed
                 ? [...existing.toBeClosed, dummyKey]
                 : [dummyKey],
+              from: commit,
             };
             delete existing.toBeClosed;
           } else {
@@ -303,6 +326,7 @@ const GitGraph = forwardRef<SVGSVGElement, GitGraphProps>((props, ref) => {
               xIndex: currentLane,
               lastxy: { x, y },
               pathStr: `M ${x} ${y}`, // Creates a fresh string
+              from: commit,
             };
             if (!branchPool[primaryParentId].toBeClosed)
               branchPool[primaryParentId].toBeClosed = [];
@@ -322,6 +346,7 @@ const GitGraph = forwardRef<SVGSVGElement, GitGraphProps>((props, ref) => {
             xIndex: targetLane,
             lastxy: { x, y },
             pathStr: `M ${x} ${y}`, // Creates a fresh string
+            from: commit,
           };
 
           if (!branchPool[parentId]) {
@@ -355,7 +380,8 @@ const GitGraph = forwardRef<SVGSVGElement, GitGraphProps>((props, ref) => {
           if (parent.meta == null) {
             parent.meta = { yIndex: parentIndex, prev: [] };
           }
-          if(parent.meta.prev.indexOf(commit.id) < 0) parent.meta.prev.push(commit.id);
+          if (parent.meta.prev.indexOf(commit.id) < 0)
+            parent.meta.prev.push(commit.id);
         }
       });
     });
@@ -365,7 +391,7 @@ const GitGraph = forwardRef<SVGSVGElement, GitGraphProps>((props, ref) => {
     });
 
     completedPaths.forEach((path) => {
-      drawFinalPath(edges, path.d, path.color, DEFAULT_EDGEWIDTH);
+      drawFinalPath(edges, path.d, path.color, path.from, path.to);
     });
     return { nodes, edges };
   }, [{ ...props }]);
