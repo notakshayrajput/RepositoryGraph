@@ -1,9 +1,10 @@
 {
   "name": "git-graph-svg",
+  "description": "Lightweight SVG-based Git commit graph renderer for React with automatic branch layout.",
   "private": false,
   "version": "2.0.5",
-  "main": "dist/git-repo-graph.umd.js",
-  "module": "dist/git-repo-graph.es.js",
+  "main": "dist/git-graph-svg.umd.js",
+  "module": "dist/git-graph-svg.es.js",
   "types": "dist/index.d.ts",
   "type": "module",
   "license": "MIT",
@@ -13,10 +14,29 @@
   "files": [
     "dist"
   ],
-  "peerDependencies": {
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+  "author": {
+    "name": "Akshay Rajput",
+    "url": "https://github.com/notakshayrajput"
   },
+  "bugs": {
+    "url": "https://github.com/notakshayrajput/RepositoryGraph/issues"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/git-graph-svg.es.js",
+      "require": "./dist/git-graph-svg.umd.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/notakshayrajput/RepositoryGraph.git"
+  },
+  "homepage": "https://github.com/notakshayrajput/RepositoryGraph",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -41,5 +61,16 @@
   },
   "dependencies": {
     "delaunator": "^5.0.1"
-  }
+  },
+  "keywords": [
+    "git",
+    "git graph",
+    "git visualization",
+    "react git graph",
+    "commit graph",
+    "git branch graph",
+    "git history visualization",
+    "react svg graph"
+  ],
+  "sideEffects": false
 }

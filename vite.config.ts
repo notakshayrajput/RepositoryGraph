@@ -17,7 +17,7 @@ export default defineConfig({
     lib: {
       entry: path.resolve(__dirname, "src/index.ts"),
       name: "GitRepoGraph",
-      fileName: (format) => `git-repo-graph.${format}.js`,
+      fileName: (format) => `git-graph-svg.${format}.js`,
     },
     rollupOptions: {
       external: ["react", "react-dom"],
