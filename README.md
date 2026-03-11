@@ -16,11 +16,13 @@ rendering.
 -   🧩 Render overrides (`renderNode`, `renderEdge`)\
 -   📐 Fully SVG-based (no canvas)\
 -   ⚡ Lightweight & dependency-free
+-   🌿 Supports complex branch & merge histories
 
 ------------------------------------------------------------------------
 
 ## 📐 Screenshots
 ![Screenshot](https://raw.githubusercontent.com/notakshayrajput/RepositoryGraph/refs/heads/main/images/examples.png)
+![Screenshot](https://raw.githubusercontent.com/notakshayrajput/RepositoryGraph/refs/heads/main/images/examples1.png)
 
 ## 🚀 Basic Usage
 
