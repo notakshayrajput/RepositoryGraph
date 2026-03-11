@@ -1,35 +1,52 @@
 # GitGraphSVG
 
-A lightweight, customizable **SVG-based Git commit graph renderer for
-React**.
+A lightweight, customizable **SVG-based Git commit graph renderer for React**.
 
-`GitGraphSVG` renders a commit history with branching and merging
-support, automatic lane allocation, and customizable node/edge
-rendering.
+`git-graph-svg` renders a Git-style commit history with branching and merging support, automatic lane allocation, and fully customizable node and edge rendering.
 
-------------------------------------------------------------------------
+Built for **flexibility, performance, and zero dependencies**.
 
-## ✨ Features
+---
 
--   🔀 Automatic branch lane management\
--   🎨 Customizable color palette\
--   🧩 Render overrides (`renderNode`, `renderEdge`)\
--   📐 Fully SVG-based (no canvas)\
--   ⚡ Lightweight & dependency-free
--   🌿 Supports complex branch & merge histories
+# ✨ Features
 
-------------------------------------------------------------------------
+* 🔀 Automatic branch lane management
+* 🎨 Customizable branch color palettes
+* 🧩 Fully customizable node and edge rendering
+* 📐 Pure SVG rendering (no canvas)
+* ⚡ Lightweight & dependency-free
+* 🌿 Supports complex branch & merge histories
 
-## 📐 Screenshots
+---
+
+# 📐 Screenshots
+
 ![Screenshot](https://raw.githubusercontent.com/notakshayrajput/RepositoryGraph/refs/heads/main/images/examples.png)
+
 ![Screenshot](https://raw.githubusercontent.com/notakshayrajput/RepositoryGraph/refs/heads/main/images/examples1.png)
 
-## 🚀 Basic Usage
+---
 
-``` tsx
-import { GitGraphSVG, CommitItem } from "./GitGraphSVG";
+# 📦 Installation
 
-const commits: CommitItem[] = [
+```bash
+npm install git-graph-svg
+```
+
+or
+
+```bash
+yarn add git-graph-svg
+```
+
+---
+
+# 🚀 Basic Usage
+
+```tsx
+import { GitGraph, type ICommitItem } from "git-graph-svg";
+
+const commits: ICommitItem[] = [
   {
     id: "a1",
     message: "Initial commit",
@@ -47,77 +64,78 @@ const commits: CommitItem[] = [
 ];
 
 export default function App() {
-  return <GitGraphSVG commits={commits} />;
+  return <GitGraph commits={commits} />;
 }
 ```
 
-------------------------------------------------------------------------
+---
 
-## 📘 Data Model
+# 📘 Commit Data Model
 
-### CommitItem
-
-``` ts
-export interface CommitItem {
-  id: string;
-  message: string;
-  author: string;
-  date: string;
-  parents: string[];
+```ts
+export interface ICommitItem {
+    id: string;
+    message: string;
+    author: string;
+    date: string;
+    parents: string[];
+    meta?: any;
 }
 ```
 
-Each commit must reference its parent commit IDs in the `parents` array.
+Each commit references its parent commit IDs in the `parents` array.
 
-------------------------------------------------------------------------
+---
 
-## ⚙️ Props
+# ⚙️ Component Props
 
-``` ts
-export interface GitGraphSVGProps {
-  commits: CommitItem[];
-
-  rowHeight?: number;
-  laneWidth?: number;
-  colorPalette?: string[];
-
-  renderNode?: (commit: _CommitItem) => React.ReactNode;
-
-  renderEdge?: (
-    from: _CommitItem,
-    to: _CommitItem,
-    defaultPath: string
-  ) => React.ReactNode;
+```ts
+interface GitGraphProps {
+    commits: ICommitItem[];
+    colorPalette?: string[];
+    padding?: {
+        left: number;
+        right: number;
+        bottom: number;
+        top: number;
+    } | number;
+    rowHeight?: number;
+    laneWidth?: number;
+    style?: React.CSSProperties;
+    renderNode?: (x: number, y: number, color: string, commit: ICommitItem) => ReactNode;
+    renderEdge?: (from: ICommitItem, to: ICommitItem, d: string, color: string) => ReactNode;
+    getMergeCurve?: (x1: number, y1: number, x2: number, y2: number) => string;
+    getBranchSplitCurve?: (x1: number, y1: number, x2: number, y2: number) => string;
 }
 ```
 
-------------------------------------------------------------------------
+---
 
-## 🎨 Custom Rendering
+# 🎨 Custom Rendering
 
-You can override how nodes and edges are rendered.
+The graph engine handles **layout and branch logic**, while you control how nodes and edges are rendered.
 
-### Custom Nodes
+---
 
-``` tsx
-<GitGraphSVG
+## Custom Node Rendering
+
+```tsx
+<GitGraph
   commits={commits}
-  renderNode={(commit) => (
+  renderNode={(x, y, color, commit) => (
     <g key={commit.id}>
+      <circle cx={x} cy={y} r={3} fill={color} />
+
       <circle
-        cx={commit.cx}
-        cy={commit.cy}
-        r={8}
-        fill="white"
-        stroke={commit.color}
-        strokeWidth={3}
+        cx={x}
+        cy={y}
+        r={6}
+        fill="none"
+        stroke={color}
+        strokeWidth={2}
       />
-      <text
-        x={commit.cx}
-        y={commit.cy - 10}
-        textAnchor="middle"
-        fontSize={10}
-      >
+
+      <text x={x + 20} y={y}>
         {commit.id}
       </text>
     </g>
@@ -125,88 +143,177 @@ You can override how nodes and edges are rendered.
 />
 ```
 
-------------------------------------------------------------------------
+---
 
-### Custom Edges
+## Custom Edge Rendering
 
-``` tsx
-<GitGraphSVG
+```tsx
+<GitGraph
   commits={commits}
-  renderEdge={(from, to, path) => (
+  renderEdge={(from, to, path, color) => (
     <path
       key={`${from.id}-${to.id}`}
       d={path}
-      stroke="black"
-      strokeDasharray="4 2"
+      stroke={color}
+      strokeWidth={2}
       fill="none"
+      strokeDasharray="5,5"
     />
   )}
 />
 ```
 
-------------------------------------------------------------------------
+---
 
-## 🎨 Default Configuration
+## 🎨 Custom Color Palette
 
-``` ts
-const LANE_WIDTH = 50;
-const NODE_RADIUS = 5;
-
-const COLOR_PALETTE = [
-  "#3a86ff",
-  "#8338ec",
-  "#ff006e",
-  "#fb5607",
-  "#ffbe0b"
-];
+```tsx
+<GitGraph
+  commits={commits}
+  colorPalette={[
+    "#8338ec",
+    "#ff006e",
+    "#fb5607",
+    "#ffbe0b"
+  ]}
+/>
 ```
 
-If more branches exist than available colors, random colors are
-generated automatically.
+If the number of active branches exceeds the palette size, additional colors are generated automatically.
 
-------------------------------------------------------------------------
+---
 
-## 📏 Layout Rules
+## 🧪 Example: Multiple Graph Styles
 
--   Vertical spacing = `rowHeight`
--   Horizontal spacing = `laneWidth`
--   SVG width = `lanesCount * laneWidth`
--   SVG height = `commits.length * rowHeight`
+```tsx
+import { useMemo } from "react";
+import { GitGraph, type ICommitItem } from "git-graph-svg";
+import { heavyCommitDataset } from "./type";
 
-------------------------------------------------------------------------
+function App() {
+  const commits = useMemo(
+    () =>
+      heavyCommitDataset.sort(
+        (a: any, b: any) =>
+          new Date(b.date).getTime() - new Date(a.date).getTime()
+      ),
+    [heavyCommitDataset]
+  );
 
-## 🔄 Merge & Branch Handling
+  return (
+    <div style={{ display: "flex" }}>
+      
+      {/* Graph with custom nodes and dashed edges */}
+      <GitGraph
+        commits={commits}   
+        rowHeight={25}
+        laneWidth={25}
+        renderNode={(x, y, color, commit) => (
+          <g key={commit.id}>
+            <circle cx={x} cy={y} r={3} fill={color} />
+            <circle
+              cx={x}
+              cy={y}
+              r={6}
+              fill="none"
+              stroke={color}
+              strokeWidth={2}
+            />
+            <text x={x + 20} y={y}>
+              {commit.id}
+            </text>
+          </g>
+        )}
+        renderEdge={(from, to, d, color) => (
+          <path
+            key={`${from.id}-${to.id}`}
+            d={d}
+            stroke={color}
+            strokeWidth={2}
+            fill="none"
+            strokeDasharray="5,5"
+          />
+        )}
+      />
 
--   Straight lines are drawn when commits stay in the same lane.
--   Smooth Bézier curves are used when switching lanes.
--   Multiple parents are supported.
--   Lane colors are automatically reassigned when branches end.
+      {/* Default graph */}
+      <GitGraph commits={commits} rowHeight={35} laneWidth={35} />
 
-------------------------------------------------------------------------
 
-## 🧠 Design Philosophy
+    </div>
+  );
+}
 
-`GitGraphSVG` is designed as a **rendering engine**, not a UI component.
+export default App;
+```
 
-It: - Calculates layout - Assigns lanes and colors - Generates edge
-paths - Exposes rendering hooks
+---
 
-You control the visual layer.
+# 📏 Layout Rules
 
-------------------------------------------------------------------------
+| Property  | Description                         |
+| --------- | ----------------------------------- |
+| rowHeight | Vertical spacing between commits    |
+| laneWidth | Horizontal spacing between branches |
+| width     | `laneCount * laneWidth`             |
+| height    | `commitCount * rowHeight`           |
 
-## 🚀 Possible Future Enhancements
+---
 
--   Animations
--   Hover interactions
--   Zoom & pan
--   Horizontal layout support
--   Stepped lane transitions
--   Commit grouping
--   Performance optimization for large graphs
+# 🔄 Branch & Merge Handling
 
-------------------------------------------------------------------------
+The engine automatically handles:
 
-## 📜 License
+* Branch creation
+* Branch merging
+* Lane reuse when branches end
+* Multiple parent commits
+* Smooth lane transitions
+
+Rendering rules:
+
+* Straight lines when commits stay in the same lane
+* Smooth curves when switching lanes
+* Colors follow branch lineage
+
+---
+
+# 🧠 Design Philosophy
+
+`git-graph-svg` is designed as a **rendering engine**, not a UI component.
+
+It handles:
+
+* commit layout
+* lane allocation
+* edge path generation
+* color management
+
+You control the **visual layer**.
+
+This makes it easy to integrate with:
+
+* Git visualizers
+* CI/CD dashboards
+* repository browsers
+* build pipeline UIs
+
+---
+
+# 🚀 Future Enhancements
+
+Possible upcoming improvements:
+
+* animations
+* hover tooltips
+* zoom & pan
+* horizontal layout support
+* commit grouping
+* performance optimizations for large repositories
+* interactive branch highlighting
+
+---
+
+# 📜 License
 
 MIT
